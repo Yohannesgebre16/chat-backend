@@ -1,0 +1,141 @@
+What is Socket.IO?
+
+A library for real-time, two-way communication between server and client.
+
+Built on WebSockets with fallbacks (polling, etc.).
+
+Extra features: auto-reconnect, rooms, namespaces, middleware.
+
+Common use: chat apps, notifications, multiplayer games, live dashboards.
+
+
+2 Basic setup
+
+// server.js
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+
+const app = express();
+const server = http.createServer(app); 
+const io = new Server(server, {
+  cors: {
+    origin: "*", // allow all origins (dev)
+    methods: ["GET", "POST"],
+  },
+});
+
+io.on("connection", (socket) => {
+  console.log("✅ User connected:", socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected:", socket.id);
+  });
+});
+
+server.listen(5000, () => {
+  console.log("🚀 Server running on http://localhost:5000");
+});
+3 Events
+
+// server.js
+io.on("connection", (socket) => {
+  // listen for event from client
+  socket.on("hello", (msg) => {
+    console.log("📩 Client says:", msg);
+
+    // reply back to client
+    socket.emit("helloResponse", "Hello from server 👋");
+  });
+});
+4 Brodcasting
+
+Send a message to all clients (except sender).
+
+socket.broadcast.emit("chatMessage", {
+  user: socket.id,
+  text: "Hello everyone!"
+});
+
+
+send to all including sender
+
+io.emit("chatMessage", "Message for everyone!");
+5 rooms
+io.on("connection", (socket) => {
+  socket.on("joinRoom", (roomName) => {
+    socket.join(roomName);
+    console.log(`${socket.id} joined ${roomName}`);
+
+    // notify only that room
+    io.to(roomName).emit("roomMessage", `${socket.id} joined!`);
+  });
+});
+send only inside a room
+io.to("room1").emit("roomMessage", "Hello room1!");
+6. namespaces
+
+const chat = io.of("/chat");
+chat.on("connection", (socket) => {
+  console.log("Chat namespace user:", socket.id);
+});
+
+client connect withconst socket = io("http://localhost:5000/chat");
+7 middleware(Authentication)
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token; // client must send this
+  if (token === "mysecrettoken") {
+    next();
+  } else {
+    next(new Error("Unauthorized"));
+  }
+});
+Client
+const socket = io("http://localhost:5000", {
+  auth: { token: "mysecrettoken" }
+});
+8 Error Handling
+
+io.on("connection", (socket) => {
+  socket.on("error", (err) => {
+    console.error("Socket error:", err.message);
+  });
+});
+9 Full
+
+// server.js
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
+
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  // Join room
+  socket.on("joinRoom", (room) => {
+    socket.join(room);
+    io.to(room).emit("roomMessage", `${socket.id} joined ${room}`);
+  });
+
+  // Chat message
+  socket.on("chatMessage", ({ room, message }) => {
+    io.to(room).emit("chatMessage", {
+      user: socket.id,
+      text: message,
+    });
+  });
+
+  // Disconnect
+  socket.on("disconnect", () => {
+    console.log("User left:", socket.id);
+  });
+});
+
+server.listen(5000, () => console.log("Server running on http://localhost:5000"));
+
+
